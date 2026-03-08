@@ -15,7 +15,7 @@ import argparse
 import urllib.request
 from pathlib import Path
 from typing import Dict, List, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Import from generator
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -73,23 +73,44 @@ def paper_key(p: Dict) -> str:
     return f"{p.get('source', 'unknown')}::{p.get('id', '')}"
 
 
-def load_sent_ids(state_file: Path) -> set:
+def load_state(state_file: Path) -> Dict:
     if not state_file.exists():
-        return set()
+        return {'updated_at': None, 'sent_ids': [], 'sent_map': {}}
     try:
         data = json.loads(state_file.read_text(encoding='utf-8'))
-        return set(data.get('sent_ids', []))
+        if not isinstance(data, dict):
+            return {'updated_at': None, 'sent_ids': [], 'sent_map': {}}
+        data.setdefault('updated_at', None)
+        data.setdefault('sent_ids', [])
+        data.setdefault('sent_map', {})
+        if not isinstance(data['sent_ids'], list):
+            data['sent_ids'] = []
+        if not isinstance(data['sent_map'], dict):
+            data['sent_map'] = {}
+        return data
     except Exception:
-        return set()
+        return {'updated_at': None, 'sent_ids': [], 'sent_map': {}}
 
 
-def save_sent_ids(state_file: Path, sent_ids: set):
+def save_state(state_file: Path, state: Dict):
     state_file.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        'updated_at': datetime.now().isoformat(),
-        'sent_ids': sorted(sent_ids),
-    }
-    state_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+    state['updated_at'] = datetime.now().isoformat()
+    state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding='utf-8')
+
+
+def prune_sent_map(sent_map: Dict[str, str], dedup_days: int | None) -> Dict[str, str]:
+    if dedup_days is None:
+        return sent_map
+    cutoff = datetime.now() - timedelta(days=dedup_days)
+    out = {}
+    for k, ts in sent_map.items():
+        try:
+            dt = datetime.fromisoformat(ts)
+            if dt >= cutoff:
+                out[k] = ts
+        except Exception:
+            continue
+    return out
 
 
 def init_bucket() -> Dict[str, List[Dict]]:
@@ -216,7 +237,7 @@ def format_source_block(source_name: str, cat_map: Dict[str, List[Dict]], limit_
     return lines
 
 
-def generate_feishu_message(new_by_source: Dict[str, Dict[str, List[Dict]]], pdf_folder: Path, state_file: Path) -> str:
+def generate_feishu_message(new_by_source: Dict[str, Dict[str, List[Dict]]], pdf_folder: Path, state_file: Path, dedup_days: int | None, reset_dedup: bool) -> str:
     today = datetime.now().strftime('%Y-%m-%d')
 
     total_new = sum(
@@ -231,6 +252,8 @@ def generate_feishu_message(new_by_source: Dict[str, Dict[str, List[Dict]]], pdf
         f'本次新增论文：{total_new} 篇（相对上次运行去重）',
         f'PDF目录：`{pdf_folder}`',
         f'去重状态文件：`{state_file}`',
+        f"去重窗口：{'永久' if dedup_days is None else f'最近 {dedup_days} 天'}",
+        f"本次模式：{'重置去重（全量重新判定）' if reset_dedup else '正常增量'}",
         '',
     ]
 
@@ -258,7 +281,21 @@ def main():
         default='/Users/a123456/.openclaw/workspace/skills/ai-rs-daily-papers/state/sent_ids.json',
         help='Persistent state file for sent paper IDs',
     )
+    parser.add_argument(
+        '--reset-dedup',
+        action='store_true',
+        help='Ignore and reset dedup history for this run (treat as first run)',
+    )
+    parser.add_argument(
+        '--dedup-days',
+        type=int,
+        default=None,
+        help='Only deduplicate against papers sent in last N days',
+    )
     args = parser.parse_args()
+
+    if args.dedup_days is not None and args.dedup_days <= 0:
+        raise ValueError('--dedup-days must be a positive integer')
 
     today = datetime.now().strftime('%Y-%m-%d')
     pdf_folder = Path(args.pdf_dir) / today
@@ -266,18 +303,40 @@ def main():
 
     by_source = fetch_all_sources(args.max_papers)
 
-    sent_ids = load_sent_ids(state_file)
+    state = load_state(state_file)
+
+    if args.reset_dedup:
+        sent_ids = set()
+        sent_map = {}
+    else:
+        sent_map = prune_sent_map(state.get('sent_map', {}), args.dedup_days)
+        if not sent_map and state.get('sent_ids'):
+            # backward compatibility: old state only had sent_ids (no timestamp)
+            if args.dedup_days is None:
+                sent_ids = set(state.get('sent_ids', []))
+            else:
+                sent_ids = set()
+        else:
+            sent_ids = set(sent_map.keys())
+
     new_by_source, run_ids = filter_new_only(by_source, sent_ids)
 
     print(f'Found {len(run_ids)} candidates this run; checking against history...')
     downloaded_count = download_new_pdfs(new_by_source, pdf_folder)
     print(f'Downloaded/linked {downloaded_count} PDFs for newly discovered papers.')
 
-    # Persist dedup state (union)
-    sent_ids.update(run_ids)
-    save_sent_ids(state_file, sent_ids)
+    now_iso = datetime.now().isoformat()
+    for rid in run_ids:
+        sent_map[rid] = now_iso
 
-    message = generate_feishu_message(new_by_source, pdf_folder, state_file)
+    state = {
+        'updated_at': now_iso,
+        'sent_ids': sorted(sent_map.keys()),
+        'sent_map': sent_map,
+    }
+    save_state(state_file, state)
+
+    message = generate_feishu_message(new_by_source, pdf_folder, state_file, args.dedup_days, args.reset_dedup)
     msg_file = pdf_folder / 'message.txt'
     msg_file.parent.mkdir(parents=True, exist_ok=True)
     msg_file.write_text(message, encoding='utf-8')
