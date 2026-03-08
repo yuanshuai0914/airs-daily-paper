@@ -39,6 +39,12 @@ ARXIV_WM_QUERY = (
     ')&sortBy=submittedDate&sortOrder=descending&max_results=20'
 )
 
+ARXIV_MULTIMODAL_QUERY = (
+    'search_query=(cat:cs.CV+OR+cat:cs.CL+OR+cat:cs.AI)+AND+('
+    'multimodal+OR+vision-language+OR+vlm+OR+vision+language+OR+text-image'
+    ')&sortBy=submittedDate&sortOrder=descending&max_results=20'
+)
+
 ARXIV_AGENT_QUERY = (
     'search_query=cat:cs.AI+AND+('
     'agent+OR+agentic+OR+llm+agent+OR+autonomous+agent+OR+tool+use+OR+planning'
@@ -176,6 +182,12 @@ WM_KEYWORDS = [
     'next frame prediction', 'video diffusion', 'latent diffusion'
 ]
 
+MULTIMODAL_KEYWORDS = [
+    'multimodal', 'multi-modal', 'vision-language', 'vision language',
+    'vlm', 'mllm', 'vision-language model', 'text-image', 'image-text',
+    'image captioning', 'cross-modal', 'cross modal', 'audio-visual'
+]
+
 AGENT_KEYWORDS = [
     'agent', 'agentic', 'ai agent', 'llm agent', 'autonomous agent',
     'multi-agent', 'tool use', 'tool-use', 'planning', 'reasoning and acting',
@@ -189,28 +201,31 @@ def classify_paper(title: str, summary: str) -> Optional[str]:
 
     rs_score = sum(1 for kw in RS_KEYWORDS if kw.lower() in text)
     wm_score = sum(1 for kw in WM_KEYWORDS if kw.lower() in text)
+    mm_score = sum(1 for kw in MULTIMODAL_KEYWORDS if kw.lower() in text)
     agent_score = sum(1 for kw in AGENT_KEYWORDS if kw.lower() in text)
 
-    best = max(rs_score, wm_score, agent_score)
-    if best <= 0:
+    scores = {
+        'rs': rs_score,
+        'wm': wm_score,
+        'mm': mm_score,
+        'agent': agent_score
+    }
+    best_cat = max(scores, key=scores.get)
+    if scores[best_cat] <= 0:
         return None
-    if best == rs_score:
-        return 'rs'
-    if best == wm_score:
-        return 'wm'
-    return 'agent'
+    return best_cat
 
 
 # ==================== Report Generation ====================
 
-def generate_markdown_report(rs_papers: List[Dict], wm_papers: List[Dict], agent_papers: List[Dict], output_path: str):
+def generate_markdown_report(rs_papers: List[Dict], wm_papers: List[Dict], mm_papers: List[Dict], agent_papers: List[Dict], output_path: str):
     """Generate markdown report."""
     today = datetime.now().strftime('%Y-%m-%d')
 
     lines = [
         f'# AI Daily Papers - {today}',
         '',
-        f'> Auto-generated report with {len(rs_papers)} Remote Sensing papers, {len(wm_papers)} World Model papers, and {len(agent_papers)} Agent papers',
+        f'> Auto-generated report with {len(rs_papers)} Remote Sensing papers, {len(wm_papers)} World Model papers, {len(mm_papers)} Multimodal papers, and {len(agent_papers)} Agent papers',
         '',
         '---',
         '',
@@ -239,6 +254,26 @@ def generate_markdown_report(rs_papers: List[Dict], wm_papers: List[Dict], agent
     ])
 
     for i, p in enumerate(wm_papers[:15], 1):
+        pdf_link = f" | [PDF]({p['pdf_url']})" if 'pdf_url' in p else ""
+        lines.extend([
+            f"### {i}. {p['title']}",
+            '',
+            f"- **Source:** {p['source']} | **Upvotes:** {p['upvotes']}{pdf_link}",
+            f"- **ID:** `{p['id']}`",
+            f"- **URL:** {p['url']}",
+            '',
+            f"> {p['summary']}" if p['summary'] else "",
+            ''
+        ])
+
+    lines.extend([
+        '---',
+        '',
+        '## 🧩 Multimodal (Vision-Language, MLLM)',
+        ''
+    ])
+
+    for i, p in enumerate(mm_papers[:15], 1):
         pdf_link = f" | [PDF]({p['pdf_url']})" if 'pdf_url' in p else ""
         lines.extend([
             f"### {i}. {p['title']}",
@@ -283,7 +318,7 @@ def generate_markdown_report(rs_papers: List[Dict], wm_papers: List[Dict], agent
     print(f"Report saved to: {output_path}")
 
 
-def generate_compact_summary(rs_papers: List[Dict], wm_papers: List[Dict], agent_papers: List[Dict]) -> str:
+def generate_compact_summary(rs_papers: List[Dict], wm_papers: List[Dict], mm_papers: List[Dict], agent_papers: List[Dict]) -> str:
     """Generate compact summary for Feishu message."""
     today = datetime.now().strftime('%Y-%m-%d')
 
@@ -298,6 +333,13 @@ def generate_compact_summary(rs_papers: List[Dict], wm_papers: List[Dict], agent
     lines.append('')
     lines.append('🌍 World Model:')
     for i, p in enumerate(wm_papers[:5], 1):
+        title = p['title'][:50] + '...' if len(p['title']) > 50 else p['title']
+        pdf_link = f" | [PDF]({p.get('pdf_url', '')})" if 'pdf_url' in p else ""
+        lines.append(f"{i}. {title} ({p['source']}){pdf_link}")
+
+    lines.append('')
+    lines.append('🧩 Multimodal:')
+    for i, p in enumerate(mm_papers[:5], 1):
         title = p['title'][:50] + '...' if len(p['title']) > 50 else p['title']
         pdf_link = f" | [PDF]({p.get('pdf_url', '')})" if 'pdf_url' in p else ""
         lines.append(f"{i}. {title} ({p['source']}){pdf_link}")
@@ -335,13 +377,14 @@ def main():
     print("Fetching papers from arxiv...")
     arxiv_rs = fetch_arxiv_papers(ARXIV_RS_QUERY)
     arxiv_wm = fetch_arxiv_papers(ARXIV_WM_QUERY)
+    arxiv_mm = fetch_arxiv_papers(ARXIV_MULTIMODAL_QUERY)
     arxiv_agent = fetch_arxiv_papers(ARXIV_AGENT_QUERY)
 
     print("Fetching papers from openreview...")
     openreview_papers = fetch_openreview_all()
 
     # Combine and deduplicate
-    all_papers_raw = arxiv_rs + arxiv_wm + arxiv_agent + openreview_papers
+    all_papers_raw = arxiv_rs + arxiv_wm + arxiv_mm + arxiv_agent + openreview_papers
     all_papers = []
     seen_ids = set()
     for p in all_papers_raw:
@@ -351,6 +394,7 @@ def main():
 
     rs_papers = []
     wm_papers = []
+    mm_papers = []
     agent_papers = []
 
     for p in all_papers:
@@ -359,16 +403,18 @@ def main():
             rs_papers.append(p)
         elif cat == 'wm' and len(wm_papers) < 15:
             wm_papers.append(p)
+        elif cat == 'mm' and len(mm_papers) < 15:
+            mm_papers.append(p)
         elif cat == 'agent' and len(agent_papers) < 15:
             agent_papers.append(p)
 
-    print(f"Found {len(rs_papers)} RS papers, {len(wm_papers)} WM papers, {len(agent_papers)} Agent papers")
+    print(f"Found {len(rs_papers)} RS papers, {len(wm_papers)} WM papers, {len(mm_papers)} Multimodal papers, {len(agent_papers)} Agent papers")
 
     if compact_mode:
-        print(generate_compact_summary(rs_papers, wm_papers, agent_papers))
+        print(generate_compact_summary(rs_papers, wm_papers, mm_papers, agent_papers))
     else:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        generate_markdown_report(rs_papers, wm_papers, agent_papers, output_path)
+        generate_markdown_report(rs_papers, wm_papers, mm_papers, agent_papers, output_path)
     
     return 0
 
