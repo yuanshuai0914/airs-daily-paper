@@ -97,74 +97,76 @@ def fetch_arxiv_papers(query: str) -> List[Dict]:
 # ==================== OpenReview Fetcher ====================
 # Supporting multiple venues: ICLR, NeurIPS, CVPR, ICML, ECCV, AAAI
 
-OPENREVIEW_VENUES = [
-    # ICLR (multiple years)
-    'ICLR.cc/2025/Conference/-/Blind_Submission',
-    'ICLR.cc/2024/Conference/-/Blind_Submission',
-    # NeurIPS
-    'NeurIPS.cc/2024/Conference/-/Blind_Submission',
-    'NeurIPS.cc/2023/Conference/-/Blind_Submission',
-    # CVPR
-    'thecvf.com/CVPR/2025/Conference/-/Blind_Submission',
-    'thecvf.com/CVPR/2024/Conference/-/Blind_Submission',
-    # ICML
-    'ICML.cc/2025/Conference/-/Blind_Submission',
-    'ICML.cc/2024/Conference/-/Blind_Submission',
-    # ECCV
-    'thecvf.com/ECCV/2024/Conference/-/Blind_Submission',
-    'thecvf.com/ECCV/2022/Conference/-/Blind_Submission',
-    # AAAI
-    'AAAI.org/2025/Conference/-/Blind_Submission',
-    'AAAI.org/2024/Conference/-/Blind_Submission',
-]
+OPENREVIEW_API_BASE = 'https://api2.openreview.net'
 
-OPENREVIEW_RS_INVITATIONS = OPENREVIEW_VENUES
-OPENREVIEW_WM_INVITATIONS = OPENREVIEW_VENUES
+# NOTE:
+# - OpenReview API v1 + Blind_Submission invitations often return empty on public endpoints.
+# - We use API v2 with Submission invitations for better public coverage.
+OPENREVIEW_INVITATIONS = [
+    # ICLR
+    'ICLR.cc/2026/Conference/-/Submission',
+    'ICLR.cc/2025/Conference/-/Submission',
+    'ICLR.cc/2024/Conference/-/Submission',
+    # NeurIPS
+    'NeurIPS.cc/2025/Conference/-/Submission',
+    'NeurIPS.cc/2024/Conference/-/Submission',
+    # CVPR
+    'thecvf.com/CVPR/2025/Conference/-/Submission',
+    'thecvf.com/CVPR/2024/Conference/-/Submission',
+    # ICML
+    'ICML.cc/2025/Conference/-/Submission',
+    'ICML.cc/2024/Conference/-/Submission',
+    # ECCV
+    'thecvf.com/ECCV/2024/Conference/-/Submission',
+    # AAAI
+    'AAAI.org/2025/Conference/-/Submission',
+]
 
 
 def fetch_openreview_notes(invitation: str, limit: int = 100) -> List[Dict]:
     """Fetch notes from OpenReview API."""
-    url = f'https://api.openreview.net/notes?invitation={invitation}&limit={limit}'
+    url = f'{OPENREVIEW_API_BASE}/notes?invitation={invitation}&limit={limit}'
     papers = []
-    
+
     try:
         opener = get_opener()
         req = urllib.request.Request(url, headers={'User-Agent': 'AI-RSDailyPapers/1.0'})
         with opener.open(req, timeout=30) as resp:
             data = json.loads(resp.read().decode('utf-8'))
-        
+
         for note in data.get('notes', []):
             content = note.get('content', {})
             title = content.get('title', '') if isinstance(content.get('title'), str) else content.get('title', {}).get('value', '')
             abstract = content.get('abstract', '') if isinstance(content.get('abstract'), str) else content.get('abstract', {}).get('value', '')
-            
+            forum_id = note.get('forum', note.get('id', ''))
+
             papers.append({
                 'id': note.get('id', ''),
                 'title': title,
                 'summary': abstract[:300] + '...' if len(abstract) > 300 else abstract,
                 'upvotes': str(note.get('tcdate', 'N/A')),
                 'source': 'openreview',
-                'url': f'https://openreview.net/forum?id={note.get("forum", note.get("id", ""))}',
-                'pdf_url': f'https://openreview.net/pdf?id={note.get("forum", note.get("id", ""))}'
+                'url': f'https://openreview.net/forum?id={forum_id}',
+                'pdf_url': f'https://openreview.net/pdf?id={forum_id}'
             })
     except Exception as e:
         print(f"Error fetching openreview {invitation}: {e}", file=sys.stderr)
-    
+
     return papers
 
 
 def fetch_openreview_all() -> List[Dict]:
-    """Fetch all openreview papers."""
+    """Fetch all openreview papers from configured invitations."""
     all_papers = []
     seen_ids = set()
-    
-    for invitation in OPENREVIEW_RS_INVITATIONS + OPENREVIEW_WM_INVITATIONS:
+
+    for invitation in OPENREVIEW_INVITATIONS:
         papers = fetch_openreview_notes(invitation, limit=50)
         for p in papers:
             if p['id'] not in seen_ids:
                 seen_ids.add(p['id'])
                 all_papers.append(p)
-    
+
     return all_papers
 
 
