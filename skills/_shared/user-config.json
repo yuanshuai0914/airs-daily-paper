@@ -1,6 +1,6 @@
 {
   "paths": {
-    "obsidian_vault": "~/ObsidianVault",
+    "obsidian_vault": "C:/Users/镜花水月/AppData/Local/Programs/Obsidian",
     "paper_notes_folder": "论文笔记",
     "daily_papers_folder": "DailyPapers",
     "concepts_folder": "_概念",
@@ -9,14 +9,8 @@
   },
   "daily_papers": {
     "keywords": [
-      "world model",
-      "diffusion model",
-      "embodied ai",
-      "3d gaussian splatting",
-      "4d gaussian splatting",
-      "sim-to-real",
-      "sim2real",
-      "robot simulation"
+      "vla",
+      "world model"
     ],
     "negative_keywords": [
       "medical imaging",
