@@ -21,12 +21,16 @@ description: |
 - `AUTO_REFRESH_INDEXES`
 - `GIT_COMMIT_ENABLED`
 - `GIT_PUSH_ENABLED`
+- `BACKEND`
+- `FEISHU_AUTO_SYNC`
 
 其中：
 
 - `NOTES_PATH = {VAULT_PATH}/{paper_notes_folder}`
 - `CONCEPTS_PATH = {NOTES_PATH}/{concepts_folder}`
 - `GIT_PUSH_ENABLED` 只有在 `GIT_COMMIT_ENABLED=true` 时才可能为真
+- `BACKEND = publishing.backend`
+- `FEISHU_AUTO_SYNC = publishing.auto_sync`
 
 后续步骤统一使用上面的变量。
 
@@ -65,6 +69,14 @@ python3 ../_shared/generate_paper_mocs.py
 只有在上面两项都满足时才 commit。
 
 只有在 `GIT_PUSH_ENABLED=true` 且仓库已配置远端时才 push。
+
+如果 `BACKEND=feishu` 且 `FEISHU_AUTO_SYNC=true`，目录页脚本执行完成后再同步一次：
+
+```bash
+python3 ../_shared/feishu_sync.py \
+  --dir "{paper_notes_folder}" \
+  --dir "{paper_notes_folder}/{concepts_folder}"
+```
 
 ## 结果要求
 

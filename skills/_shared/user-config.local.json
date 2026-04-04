@@ -1,0 +1,14 @@
+{
+  "paths": {
+    "knowledge_base_root": "~/PaperKnowledgeBase"
+  },
+  "publishing": {
+    "backend": "feishu",
+    "auto_sync": true,
+    "feishu": {
+      "cli_path": "/Users/shuaiyuan/.npm-global/bin/lark-cli",
+      "identity": "user",
+      "wiki_space": "my_library"
+    }
+  }
+}

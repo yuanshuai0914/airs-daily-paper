@@ -16,6 +16,7 @@ The script:
 """
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -108,6 +109,7 @@ def match_papers_with_notes(content: str, notes_index: dict) -> list:
                 'paper_title': paper_title,
                 'method_name': method_name,
                 'note_name': notes_index[method_lower]['name'],
+                'note_path': notes_index[method_lower]['path'],
                 'section_start': section_start,
                 'source_line_end': section_start + source_line_end,
             })
@@ -128,7 +130,8 @@ def backfill_links(recommendation_path: Path, notes_index: dict) -> int:
 
     # Insert note links (in reverse order to preserve positions)
     for match in reversed(matches):
-        insert_text = f'\n- 📒 **笔记**: [[{match["note_name"]}]]'
+        relative_link = _relative_markdown_link(recommendation_path, match["note_name"], match["note_path"])
+        insert_text = f'\n- 📒 **笔记**: {relative_link}'
         content = (
             content[:match['source_line_end']] +
             insert_text +
@@ -160,20 +163,13 @@ def update_diversion_table(recommendation_path: Path, notes_index: dict, matches
 
     # Update wikilinks for papers that have notes
     for match in matches:
-        # Find the paper in the table and update its wikilink
-        # Pattern: [[current_link]]（description）
-        old_pattern = rf'\[\[([^\]]+)\]\]（[^)]*{re.escape(match["method_name"])}[^)]*）'
-        new_text = f'[[{match["note_name"]}]]'
-
-        # Check if the link needs updating
-        if match['method_name'].lower() != match['note_name'].lower():
-            # Update the wikilink but keep the description
-            table_content = re.sub(
-                rf'\[\[{re.escape(match["method_name"])}\]\]',
-                f'[[{match["note_name"]}]]',
-                table_content,
-                flags=re.IGNORECASE
-            )
+        relative_link = _relative_markdown_link(recommendation_path, match["note_name"], match["note_path"])
+        table_content = re.sub(
+            rf'\[\[{re.escape(match["method_name"])}\]\]',
+            relative_link,
+            table_content,
+            flags=re.IGNORECASE
+        )
 
     # Replace the table in content
     content = content[:table_start] + table_content + content[table_end:]
@@ -201,6 +197,14 @@ def main():
     # Backfill links
     count = backfill_links(recommendation_path, notes_index)
     print(f"Added {count} note links to recommendation file")
+
+
+def _relative_markdown_link(recommendation_path: Path, note_name: str, note_path: Path) -> str:
+    relative_path = os.path.relpath(
+        (NOTES_DIR.parent / note_path).resolve(),
+        start=recommendation_path.parent.resolve(),
+    ).replace(os.sep, "/")
+    return f'[{note_name}]({relative_path})'
 
 
 if __name__ == '__main__':

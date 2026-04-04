@@ -1,5 +1,6 @@
 {
   "paths": {
+    "knowledge_base_root": "",
     "obsidian_vault": "~/ObsidianVault",
     "paper_notes_folder": "论文笔记",
     "daily_papers_folder": "DailyPapers",
@@ -78,5 +79,17 @@
     "auto_refresh_indexes": true,
     "git_commit": false,
     "git_push": false
+  },
+  "publishing": {
+    "backend": "obsidian",
+    "auto_sync": false,
+    "feishu": {
+      "cli_path": "lark-cli",
+      "identity": "user",
+      "folder_token": "",
+      "wiki_space": "",
+      "wiki_node": "",
+      "manifest_file": ".feishu_manifest.json"
+    }
   }
 }

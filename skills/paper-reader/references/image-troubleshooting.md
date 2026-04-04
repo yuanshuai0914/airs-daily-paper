@@ -46,7 +46,7 @@ python3 ../daily-papers/download_note_images.py "{笔记路径}"
 脚本行为：
 - 并发检查所有外链图片的 HTTP 可达性（10s 超时）
 - **可达** → 保持外链不动
-- **不可达** → 下载到 `assets/{方法名}_fig{N}.{ext}`，替换为 `![[...]]` wikilink
+- **不可达** → 下载到 `assets/{方法名}_fig{N}.{ext}`，替换为标准 Markdown 本地图片链接
 - 下载也失败时，尝试从 PDF 提取对应 figure
 - 有本地化操作时，自动更新 frontmatter `image_source: online` → `mixed`
 
@@ -77,8 +77,8 @@ WebFetch 返回的图片路径可能是**相对路径**（如 `2603.05312v1/x1.p
 
 **本地**（外链不可用时的备选）:
 ```markdown
-![[{方法名}_fig1_overview.png]]
-![[{方法名}_fig1_overview.png|600]]  <!-- 指定宽度 -->
+![Figure 1](assets/{方法名}_fig1_overview.png)
+![Figure 1](assets/{方法名}_fig1_overview.png)
 ```
 
 ## frontmatter 中记录图片来源

@@ -26,6 +26,8 @@ description: |
 - `AUTO_REFRESH_INDEXES`
 - `GIT_COMMIT_ENABLED`
 - `GIT_PUSH_ENABLED`
+- `BACKEND`
+- `FEISHU_AUTO_SYNC`
 - `ENRICHED_INPUT = /tmp/daily_papers_enriched.json`
 
 其中：
@@ -34,6 +36,8 @@ description: |
 - `CONCEPTS_PATH = {NOTES_PATH}/{concepts_folder}`
 - `DAILY_PAPERS_PATH = {VAULT_PATH}/{daily_papers_folder}`
 - `GIT_PUSH_ENABLED` 只有在 `GIT_COMMIT_ENABLED=true` 时才可能为真
+- `BACKEND = publishing.backend`
+- `FEISHU_AUTO_SYNC = publishing.auto_sync`
 
 后续步骤统一使用上面的变量。
 
@@ -48,7 +52,9 @@ description: |
 ### Step 1: 概念库补充
 
 **1a: 提取概念列表**
-1. 扫描今天的推荐文件，提取所有 `[[...]]` 链接
+1. 扫描今天的推荐文件，提取所有概念引用：
+   - 旧格式：`[[...]]`
+   - 新格式：`[概念名](相对路径)` 或纯文本概念名（结合上下文判断）
 2. 额外从 `/tmp/daily_papers_enriched.json` 的 `method_names` 列表中提取所有方法名
 3. 合并去重
 
@@ -123,22 +129,22 @@ paper-reader 在独立的 Task agent 中运行，不会占用主 agent 的 conte
 对匹配到笔记的论文，在 `- **来源**:` 行之后插入一行：
 
 ```markdown
-- 📒 **笔记**: [[笔记名]]
+- 📒 **笔记**: [笔记名](相对路径)
 ```
 
-其中 `笔记名` 是不含 `.md` 后缀的文件名（Obsidian 会自动解析到正确路径）。
+其中链接应使用相对于推荐文件的标准 Markdown 路径。
 
 - 如果该论文已有 `📒 **已有笔记**` 或 `📒 **笔记**` 行，跳过不重复添加
 - 使用 Edit 工具逐篇插入，确保不破坏文件其他内容
 
-**3d: 同步修正分流表 wikilink**
+**3d: 同步修正分流表链接**
 
-paper-reader 生成笔记时会自行决定文件名（通常用方法名缩写，如 `DAPL`），可能与分流表中的 `[[wikilink]]` 不一致（如分流表写了 `[[Emerging Extrinsic Dexterity]]`）。因此回填时必须检查并修正：
+paper-reader 生成笔记时会自行决定文件名（通常用方法名缩写，如 `DAPL`），可能与分流表中的文本标记不一致（如分流表写了 `Emerging Extrinsic Dexterity`）。因此回填时必须检查并修正：
 
 1. 对每篇已生成笔记的论文，拿到实际笔记文件名（如 `DAPL`）
-2. 在分流表（`## 分流表` 区域）中查找该论文的 `[[...]]` 链接
-3. 如果 wikilink 文本与实际笔记文件名不一致，用 Edit 替换为 `[[实际文件名]]`
-4. 同样检查论文详评标题下方是否有不一致的 wikilink，一并修正
+2. 在分流表（`## 分流表` 区域）中查找该论文的现有标记
+3. 如果文本与实际笔记文件名不一致，用标准 Markdown 链接 `[实际文件名](相对路径)` 替换
+4. 同样检查论文详评标题下方是否有不一致的链接，一并修正
 
 ### Step 4: 刷新 MOC 索引
 
@@ -166,12 +172,26 @@ cd {VAULT_PATH} && git add -A && git commit -m "daily papers: notes YYYY-MM-DD"
 
 只有在 `GIT_PUSH_ENABLED=true` 且仓库已配置远端时才 push。
 
+### Step 6: Feishu 同步
+
+仅当 `BACKEND=feishu` 且 `FEISHU_AUTO_SYNC=true` 时执行。把这次改动到的推荐文件、论文笔记目录、概念目录同步到飞书：
+
+```bash
+python3 ../_shared/feishu_sync.py \
+  --file "{daily_papers_folder}/YYYY-MM-DD-论文推荐.md" \
+  --dir "{paper_notes_folder}" \
+  --dir "{paper_notes_folder}/{concepts_folder}"
+```
+
+如果你明确知道本次只新增了少量文件，优先用 `--file` 精确同步，避免全量上传过慢。
+
 ## 输出
 
 完成后告知用户：
 - 创建了多少个新概念
 - 生成了多少篇论文笔记
 - 回填了多少个笔记链接
+- 如果启用了 Feishu，同步了多少个飞书文档
 - 流水线全部完成
 
 ## 注意事项

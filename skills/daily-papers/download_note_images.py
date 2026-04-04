@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Selectively download unreachable images in Obsidian markdown notes.
+"""Selectively download unreachable images in markdown notes.
 
 Usage:
     python3 download_note_images.py <note.md>
 
 For each external image link ![...](https://...):
   - Reachable (HTTP 200 within 10s) → keep as-is
-  - Unreachable → download to assets/ and replace with Obsidian wikilink
+  - Unreachable → download to assets/ and replace with a local markdown image link
 """
 
 import asyncio
@@ -229,7 +229,7 @@ async def process_note(note_path: Path) -> dict:
                     ok = True
 
         if ok and local_path.exists() and local_path.stat().st_size > 1024:
-            new_ref = f"![[{local_name}|600]]"
+            new_ref = f"![Figure {fig_num}](assets/{local_name})"
             replacements[img["full_match"]] = new_ref
             localized += 1
             print(f"  [OK] Localized → {local_name}")

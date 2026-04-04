@@ -2,7 +2,7 @@
 name: daily-papers-review
 description: |
   论文点评（3 步流水线的第 2 步）。读取富化后的论文数据，扫描笔记库，生成有态度的推荐点评，
-  保存推荐文件到 Obsidian，更新 history；git 自动化默认关闭。
+  保存推荐文件到本地知识库；如果启用了 Feishu，则自动同步到飞书文档。git 自动化默认关闭。
 
   触发词："论文点评"、"跑一下论文点评"
 ---
@@ -11,7 +11,7 @@ description: |
 
 # 论文点评 (Review + Save)
 
-你是 用户的论文点评系统（3 步流水线的第 2 步）。读取富化数据 → 扫描笔记库 → 生成推荐点评 → 保存到 Obsidian。
+你是 用户的论文点评系统（3 步流水线的第 2 步）。读取富化数据 → 扫描笔记库 → 生成推荐点评 → 保存到本地知识库；如果启用了 Feishu，再同步到飞书。
 
 ## Step 0: 读取共享配置
 
@@ -26,6 +26,8 @@ description: |
 - `AUTO_REFRESH_INDEXES`
 - `GIT_COMMIT_ENABLED`
 - `GIT_PUSH_ENABLED`
+- `BACKEND`
+- `FEISHU_AUTO_SYNC`
 - `ENRICHED_INPUT = /tmp/daily_papers_enriched.json`
 
 其中：
@@ -34,6 +36,8 @@ description: |
 - `CONCEPTS_PATH = {NOTES_PATH}/{concepts_folder}`
 - `DAILY_PAPERS_PATH = {VAULT_PATH}/{daily_papers_folder}`
 - `GIT_PUSH_ENABLED` 只有在 `GIT_COMMIT_ENABLED=true` 时才可能为真
+- `BACKEND = publishing.backend`
+- `FEISHU_AUTO_SYNC = publishing.auto_sync`
 
 后续步骤统一使用上面的变量。
 
@@ -44,9 +48,9 @@ description: |
 
 ## 工作流程
 
-### Phase 4: 扫描 Obsidian 笔记库索引 + 匹配已有论文笔记
+### Phase 4: 扫描本地笔记库索引 + 匹配已有论文笔记
 
-主 Agent 自己完成，用 Glob 和 Read 工具扫描 Obsidian 笔记库：
+主 Agent 自己完成，用 Glob 和 Read 工具扫描本地笔记库：
 
 1. 扫描 `{NOTES_PATH}/` 下所有分类目录（跳过 `_` 开头但保留 `_待整理`），列出每个分类下的 `.md` 文件名
 2. 扫描 `{CONCEPTS_PATH}/` 下所有主题目录，列出每个主题下的概念笔记
@@ -54,9 +58,9 @@ description: |
 
 ```
 ### 分类名
-  - [[笔记名]] (相对路径)
+  - [笔记名](相对路径)
 ### 概念/主题名
-  - [[概念1]], [[概念2]], ...
+  - 概念1, 概念2, ...
 ```
 
 4. **匹配已有论文笔记**：将候选论文与笔记库中的论文笔记进行匹配。匹配规则：
@@ -143,14 +147,14 @@ description: |
 
 | 等级 | 论文 |
 |------|------|
-| 🔥 必读 | [[CoWVLA]]（VLA + world model）· [[NE-Dreamer]]（decoder-free WM） |
-| 👀 值得看 | [[Utonia]]（统一点云 encoder）· [[RoboLight]]（光照数据集） |
-| 💤 可跳过 | [[DEVS]]（离 robotics 太远）· [[XXX]]（方法无新意） |
+| 🔥 必读 | `CoWVLA`（VLA + world model）· `NE-Dreamer`（decoder-free WM） |
+| 👀 值得看 | `Utonia`（统一点云 encoder）· `RoboLight`（光照数据集） |
+| 💤 可跳过 | `DEVS`（离 robotics 太远）· `XXX`（方法无新意） |
 ```
 
 分流表规则：
-- 论文名用 `[[wikilink]]`，Obsidian 中可直接跳转到笔记
-- **wikilink 必须使用论文的方法名/模型名缩写**（如 `[[DAPL]]`、`[[NE-Dreamer]]`），不要用完整论文标题（如 ~~`[[Emerging Extrinsic Dexterity in Cluttered Scenes]]`~~）。方法名通常是标题冒号前的缩写，或 `method_names` 列表中排第一的名称。这样后续 paper-reader 生成笔记时文件名能自动匹配
+- 论文名默认用方法名/模型名缩写的代码样式（如 `DAPL`、`NE-Dreamer`），避免强绑 Obsidian 双链
+- 方法名通常是标题冒号前的缩写，或 `method_names` 列表中排第一的名称。这样后续 paper-reader 生成笔记时文件名能自动匹配
 - 每篇论文后括号内一句话说明理由
 - 同等级论文用 `·` 分隔，写在同一行
 
@@ -168,7 +172,7 @@ description: |
 > ⏪ **再推提醒**：这篇在 {last_recommend_date} 推荐过
 > ← 仅对 is_re_recommend=true 的论文显示
 
-- 📒 **已有笔记**: [[existing_note_name]] — 直接看笔记，不再重复解释
+- 📒 **已有笔记**: [existing_note_name](相对路径) — 直接看笔记，不再重复解释
 ```
 
 **对于没有笔记的论文**，使用完整格式：
@@ -187,12 +191,12 @@ description: |
 
 - **核心方法**: 3-5 句话讲清楚方法怎么工作（基于 method_summary 富化数据，不要复述摘要）。必须包含：
   1. 输入/输出是什么
-  2. 关键技术组件（架构、损失函数、训练策略），首次出现的技术名词用 [[]] 双链标注
+  2. 关键技术组件（架构、损失函数、训练策略），首次出现的技术名词优先用普通文字；只有在你明确知道相对路径时才使用标准 Markdown 链接
   3. 与现有方法的核心区别
-- **对比方法/Baselines**: 从方法名列表中提取论文对比了哪些方法、借鉴了哪些前人工作。写清楚具体方法名，并用 [[]] 双链标注（如 [[OpenVLA]]、[[DreamerV3]]、[[MuJoCo]]）。区分"对比 baseline"和"借鉴/基于的方法"
+- **对比方法/Baselines**: 从方法名列表中提取论文对比了哪些方法、借鉴了哪些前人工作。写清楚具体方法名，优先使用普通 Markdown 文本或标准链接（如 `OpenVLA`、`DreamerV3`、`MuJoCo`）。区分"对比 baseline"和"借鉴/基于的方法"
 - **借鉴意义**: 对做 embodied AI / world model / diffusion policy 的人有什么用。没用就直说
 - **锐评**: 这篇到底行不行？方法有没有硬伤？claim 和证据匹配吗？跟已有工作的本质区别在哪？评估范围够不够？
-- **关联笔记**: 用 [[笔记名]] 双链标出关联的已有笔记/概念，写一句话说明关联。没有就不写
+- **关联笔记**: 如果你知道本地相对路径，用标准 Markdown 链接 `[笔记名](相对路径)` 标出关联的已有笔记/概念；否则直接写名称和关联说明。没有就不写
 - 💡 **想精读？** 运行：`读一下 论文标题`    ← 仅对"值得看"等级的论文显示，"必读"会自动生成笔记，"可跳过"不需要
 ```
 
@@ -204,7 +208,7 @@ description: |
 
 ---
 
-### Phase 6: 保存到 Obsidian
+### Phase 6: 保存到本地知识库
 
 用 Write 工具保存到 `{DAILY_PAPERS_PATH}/YYYY-MM-DD-论文推荐.md`。
 
@@ -249,6 +253,16 @@ cd {VAULT_PATH} && git add "{daily_papers_folder}/YYYY-MM-DD-论文推荐.md" "{
 ```
 
 只有在 `GIT_PUSH_ENABLED=true` 且仓库已配置远端时才 push。
+
+3. **可选的 Feishu 同步**：
+
+仅当 `BACKEND=feishu` 且 `FEISHU_AUTO_SYNC=true` 时执行：
+
+```bash
+python3 ../_shared/feishu_sync.py --file "{daily_papers_folder}/YYYY-MM-DD-论文推荐.md"
+```
+
+同步失败时不要删除本地 Markdown，直接把错误信息告诉用户。
 
 ## 输出
 

@@ -27,6 +27,7 @@ def get_temp_dir() -> Path:
 
 DEFAULT_CONFIG = {
     "paths": {
+        "knowledge_base_root": "",
         "obsidian_vault": "~/ObsidianVault",
         "paper_notes_folder": "论文笔记",
         "daily_papers_folder": "DailyPapers",
@@ -106,6 +107,18 @@ DEFAULT_CONFIG = {
         "git_commit": False,
         "git_push": False,
     },
+    "publishing": {
+        "backend": "obsidian",
+        "auto_sync": False,
+        "feishu": {
+            "cli_path": "lark-cli",
+            "identity": "user",
+            "folder_token": "",
+            "wiki_space": "",
+            "wiki_node": "",
+            "manifest_file": ".feishu_manifest.json",
+        },
+    },
 }
 
 
@@ -155,16 +168,39 @@ def automation_config() -> dict:
     return config
 
 
+def publishing_config() -> dict:
+    return load_user_config()["publishing"]
+
+
+def feishu_config() -> dict:
+    return publishing_config()["feishu"]
+
+
+def backend_name() -> str:
+    return str(publishing_config().get("backend", "obsidian")).strip().lower() or "obsidian"
+
+
+def auto_sync_enabled() -> bool:
+    return bool(publishing_config().get("auto_sync"))
+
+
+def knowledge_base_root_path() -> Path:
+    paths = paths_config()
+    root = paths.get("knowledge_base_root") or paths.get("obsidian_vault")
+    return _expand(root)
+
+
 def obsidian_vault_path() -> Path:
-    return _expand(paths_config()["obsidian_vault"])
+    # Backward-compatible alias while the repo transitions away from Obsidian-only naming.
+    return knowledge_base_root_path()
 
 
 def paper_notes_dir() -> Path:
-    return obsidian_vault_path() / paths_config()["paper_notes_folder"]
+    return knowledge_base_root_path() / paths_config()["paper_notes_folder"]
 
 
 def daily_papers_dir() -> Path:
-    return obsidian_vault_path() / paths_config()["daily_papers_folder"]
+    return knowledge_base_root_path() / paths_config()["daily_papers_folder"]
 
 
 def concepts_dir() -> Path:
