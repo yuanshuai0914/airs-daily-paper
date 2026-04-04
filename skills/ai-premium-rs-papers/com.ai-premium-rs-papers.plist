@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ai-premium-rs-papers</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/a123456/.openclaw/workspace/skills/ai-premium-rs-papers/run_and_send.sh</string>
+    </array>
+    
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+    
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>NATURE_API_KEY</key>
+        <string></string>
+        <key>SCIENCE_API_KEY</key>
+        <string></string>
+        <key>PNAS_API_KEY</key>
+        <string></string>
+        <key>AI_PREMIUM_RS_PAPERS_PROXY</key>
+        <string></string>
+        <key>FEISHU_TARGET</key>
+        <string>ou_5bad990ac044099e73e61dbc78f63853</string>
+    </dict>
+    
+    <key>StandardOutPath</key>
+    <string>/Users/a123456/.openclaw/workspace/skills/ai-premium-rs-papers/logs/premium-rs-papers.out</string>
+    
+    <key>StandardErrorPath</key>
+    <string>/Users/a123456/.openclaw/workspace/skills/ai-premium-rs-papers/logs/premium-rs-papers.err</string>
+    
+    <key>WorkingDirectory</key>
+    <string>/Users/a123456/.openclaw/workspace/skills/ai-premium-rs-papers</string>
+</dict>
+</plist>
