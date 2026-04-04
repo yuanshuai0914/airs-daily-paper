@@ -204,4 +204,4 @@ lark-cli auth login --recommend
 
 ## 感谢
 
-感谢https://github.com/huangkiki/dailypaper-skills提供的思路和模版。
+感谢 https://github.com/huangkiki/dailypaper-skills 提供的思路和模版。
