@@ -156,11 +156,16 @@ def fetch_all_sources(max_per_category: int, hf_days: int = 1) -> Dict[str, Dict
     print(f'Fetching papers from huggingface (days={hf_days})...')
     hf_raw = fetch_hf_papers(days=hf_days)
 
-    return {
+    sources = {
         'arxiv': classify_source_papers(arxiv_raw, max_per_category),
-        'openreview': classify_source_papers(openreview_raw, max_per_category),
         'huggingface': classify_source_papers(hf_raw, max_per_category),
     }
+
+    # Only include OpenReview when source is actually available to avoid long-term empty sections
+    if openreview_raw:
+        sources['openreview'] = classify_source_papers(openreview_raw, max_per_category)
+
+    return sources
 
 
 def filter_new_only(by_source: Dict[str, Dict[str, List[Dict]]], sent_ids: set) -> Tuple[Dict[str, Dict[str, List[Dict]]], set]:
@@ -364,7 +369,8 @@ def generate_feishu_message(new_by_source: Dict[str, Dict[str, List[Dict]]], pdf
     ]
 
     lines.extend(format_source_block('ArXiv', new_by_source.get('arxiv', init_bucket())))
-    lines.extend(format_source_block('OpenReview', new_by_source.get('openreview', init_bucket())))
+    if 'openreview' in new_by_source:
+        lines.extend(format_source_block('OpenReview', new_by_source.get('openreview', init_bucket())))
     lines.extend(format_source_block('HuggingFace Daily/Trending', new_by_source.get('huggingface', init_bucket())))
 
     if total_new == 0:

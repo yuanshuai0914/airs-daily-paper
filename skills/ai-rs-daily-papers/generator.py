@@ -211,7 +211,10 @@ def fetch_hf_papers(days: int = 1) -> List[Dict]:
 # ==================== OpenReview Fetcher ====================
 # Supporting multiple venues: ICLR, NeurIPS, CVPR, ICML, ECCV, AAAI
 
-OPENREVIEW_API_BASE = 'https://api2.openreview.net'
+OPENREVIEW_API_BASES = [
+    'https://api2.openreview.net',
+    'https://api.openreview.net',
+]
 
 # NOTE:
 # - OpenReview API v1 + Blind_Submission invitations often return empty on public endpoints.
@@ -237,53 +240,78 @@ OPENREVIEW_INVITATIONS = [
 ]
 
 
-def fetch_openreview_notes(invitation: str, limit: int = 100) -> List[Dict]:
+def fetch_openreview_notes(invitation: str, limit: int = 100, api_base: str = 'https://api2.openreview.net') -> List[Dict]:
     """Fetch notes from OpenReview API."""
-    url = f'{OPENREVIEW_API_BASE}/notes?invitation={invitation}&limit={limit}'
+    url = f'{api_base}/notes?invitation={invitation}&limit={limit}'
     papers = []
 
-    try:
-        opener = get_opener()
-        req = urllib.request.Request(url, headers={'User-Agent': 'AI-RSDailyPapers/1.0'})
-        with opener.open(req, timeout=30) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
+    opener = get_opener()
+    req = urllib.request.Request(url, headers={'User-Agent': 'AI-RSDailyPapers/1.0'})
+    with opener.open(req, timeout=30) as resp:
+        data = json.loads(resp.read().decode('utf-8'))
 
-        for note in data.get('notes', []):
-            content = note.get('content', {})
-            title = content.get('title', '') if isinstance(content.get('title'), str) else content.get('title', {}).get('value', '')
-            abstract = content.get('abstract', '') if isinstance(content.get('abstract'), str) else content.get('abstract', {}).get('value', '')
-            forum_id = note.get('forum', note.get('id', ''))
+    for note in data.get('notes', []):
+        content = note.get('content', {})
+        title = content.get('title', '') if isinstance(content.get('title'), str) else content.get('title', {}).get('value', '')
+        abstract = content.get('abstract', '') if isinstance(content.get('abstract'), str) else content.get('abstract', {}).get('value', '')
+        forum_id = note.get('forum', note.get('id', ''))
 
-            authors_value = content.get('authors', [])
-            if isinstance(authors_value, dict):
-                authors_value = authors_value.get('value', [])
-            if not isinstance(authors_value, list):
-                authors_value = []
+        authors_value = content.get('authors', [])
+        if isinstance(authors_value, dict):
+            authors_value = authors_value.get('value', [])
+        if not isinstance(authors_value, list):
+            authors_value = []
 
-            papers.append({
-                'id': note.get('id', ''),
-                'title': title,
-                'summary': abstract[:300] + '...' if len(abstract) > 300 else abstract,
-                'authors': [str(x) for x in authors_value],
-                'affiliations': [],
-                'upvotes': str(note.get('tcdate', 'N/A')),
-                'source': 'openreview',
-                'url': f'https://openreview.net/forum?id={forum_id}',
-                'pdf_url': f'https://openreview.net/pdf?id={forum_id}'
-            })
-    except Exception as e:
-        print(f"Error fetching openreview {invitation}: {e}", file=sys.stderr)
+        papers.append({
+            'id': note.get('id', ''),
+            'title': title,
+            'summary': abstract[:300] + '...' if len(abstract) > 300 else abstract,
+            'authors': [str(x) for x in authors_value],
+            'affiliations': [],
+            'upvotes': str(note.get('tcdate', 'N/A')),
+            'source': 'openreview',
+            'url': f'https://openreview.net/forum?id={forum_id}',
+            'pdf_url': f'https://openreview.net/pdf?id={forum_id}'
+        })
 
     return papers
 
 
 def fetch_openreview_all() -> List[Dict]:
-    """Fetch all openreview papers from configured invitations."""
+    """Fetch all openreview papers with API base fallback and graceful 403 handling."""
     all_papers = []
     seen_ids = set()
 
+    selected_api = None
+    last_err = None
+    probe_invitation = OPENREVIEW_INVITATIONS[0] if OPENREVIEW_INVITATIONS else None
+
+    # 1) Probe available API base (avoid per-invitation noisy 403 logs)
+    if probe_invitation:
+        for api_base in OPENREVIEW_API_BASES:
+            try:
+                _ = fetch_openreview_notes(probe_invitation, limit=1, api_base=api_base)
+                selected_api = api_base
+                break
+            except urllib.error.HTTPError as e:
+                last_err = e
+                continue
+            except Exception as e:
+                last_err = e
+                continue
+
+    if not selected_api:
+        print(f"OpenReview source unavailable (fallback to arXiv + HF only): {last_err}", file=sys.stderr)
+        return []
+
+    # 2) Fetch all invitations from selected API base
     for invitation in OPENREVIEW_INVITATIONS:
-        papers = fetch_openreview_notes(invitation, limit=50)
+        try:
+            papers = fetch_openreview_notes(invitation, limit=50, api_base=selected_api)
+        except Exception as e:
+            print(f"Error fetching openreview {invitation} via {selected_api}: {e}", file=sys.stderr)
+            continue
+
         for p in papers:
             if p['id'] not in seen_ids:
                 seen_ids.add(p['id'])
