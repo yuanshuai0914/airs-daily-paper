@@ -202,3 +202,6 @@ lark-cli auth login --recommend
 
 可以，比较适合用来整理 related work、维护笔记库和生成阅读提纲。AI 生成的内容建议自己核验后再使用。
 
+## 感谢
+
+感谢https://github.com/huangkiki/dailypaper-skills提供的思路和模版。
