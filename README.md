@@ -1,12 +1,6 @@
-# dailypaper-skills
+# airs-daily-paper
 
-我平时读论文用的一套 Claude Code skills。跟 Claude 说句话就能筛论文、读论文、写笔记，最后自动存进本地 Markdown 知识库；默认兼容 Obsidian，也可以同步到 Feishu。
-
-> **新分支更新**
-> Codex / Humanoid 的分支：[`codex+humanoid`](https://github.com/huangkiki/dailypaper-skills/tree/codex%2Bhumanoid)。
-> 如果你想直接看 Codex 适配版本，建议先从这个分支开始。
-
-> 📺 [用 Claude Code 打造我的论文流水线](http://xhslink.com/o/1dhQCn40EWY) — 我随手拍的一段视频展示效果
+论文推荐、论文筛选、论文精读，最后自动存进本地 Markdown 知识库；同步到 Feishu。
 
 ## 🦴 这套东西会帮我做什么
 
@@ -14,7 +8,7 @@
 - 支持完整解析、快速摘要和批判性分析。
 - 术语可沉淀为概念笔记，方便后续串联。
 - 自动写入本地 Markdown 知识库，并维护目录页和导航页。
-- 可选同步到 Feishu 文档，减少对 Obsidian 的依赖。
+- 同步到 Feishu 文档。
 - 可接入 Zotero，省去手动复制链接。
 
 最终生成结果在本地知识库里大概会长这样：
@@ -25,10 +19,6 @@ PaperKnowledgeBase/
 ├── 论文笔记/.../*.md
 └── 论文笔记/_概念/.../*.md
 ```
-
-可直接看模板：
-
-- [Obsidian 模板](obsidian-templates/论文笔记模板.md)
 
 ## 🐕 怎么用
 
@@ -122,8 +112,6 @@ mkdir -p "$VAULT/DailyPapers" \
 
 ## Feishu 同步
 
-如果你不用 Obsidian，只想把结果发到 Feishu，可以这样配：
-
 ```json
 {
   "paths": {
@@ -214,22 +202,3 @@ lark-cli auth login --recommend
 
 可以，比较适合用来整理 related work、维护笔记库和生成阅读提纲。AI 生成的内容建议自己核验后再使用。
 
-**默认会动我的 git 仓库吗？**
-
-不会。`commit / push` 默认关闭，只有你自己打开配置后才会执行。
-
-## ⚠️ 免责声明
-
-这是我个人研究工作流的开源整理。AI 生成的推荐、点评和笔记可能有事实错误或遗漏，所以更适合作为辅助工具，而不是直接替代你的研究判断。
-
-另外，这套东西难免会有 bug，平台和环境适配问题也很正常；如果你遇到小问题，最省事的办法通常就是直接让 AI 帮你一起改。
-
-## ⭐ 支持这个项目
-
-如果这套 workflow 对你有帮助，欢迎提 PR、开 issue，或者顺手点个 Star。像 [`codex+humanoid`](https://github.com/huangkiki/dailypaper-skills/tree/codex%2Bhumanoid) 这种兼容性适配也很欢迎，一起补会比我一个人慢慢填坑快很多。
-
-[![Star History Chart](https://api.star-history.com/svg?repos=huangkiki/dailypaper-skills&type=Date)](https://www.star-history.com/#huangkiki/dailypaper-skills&Date)
-
-## License
-
-Apache-2.0. See `LICENSE`.
