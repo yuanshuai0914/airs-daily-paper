@@ -166,14 +166,28 @@ def fetch_hf_papers(days: int = 1) -> List[Dict]:
             req = urllib.request.Request(endpoint, headers={'User-Agent': 'AI-RSDailyPapers/1.0'})
             with opener.open(req, timeout=30) as resp:
                 items = json.loads(resp.read().decode('utf-8'))
-            for item in items if isinstance(items, list) else []:
-                p = _parse_hf_item(item, 'hf-daily')
-                if not p:
-                    continue
-                if p['id'] not in papers:
-                    papers[p['id']] = p
         except Exception as e:
-            print(f"Error fetching hf-daily {d}: {e}", file=sys.stderr)
+            # If date endpoint fails (e.g. future/simulated date), fallback once to default daily endpoint
+            if i == 0:
+                try:
+                    fallback = 'https://huggingface.co/api/daily_papers?limit=100'
+                    req = urllib.request.Request(fallback, headers={'User-Agent': 'AI-RSDailyPapers/1.0'})
+                    with opener.open(req, timeout=30) as resp:
+                        items = json.loads(resp.read().decode('utf-8'))
+                    print(f"hf-daily date endpoint failed for {d}, fallback to latest daily list", file=sys.stderr)
+                except Exception as e2:
+                    print(f"Error fetching hf-daily {d}: {e}; fallback failed: {e2}", file=sys.stderr)
+                    items = []
+            else:
+                print(f"Error fetching hf-daily {d}: {e}", file=sys.stderr)
+                items = []
+
+        for item in items if isinstance(items, list) else []:
+            p = _parse_hf_item(item, 'hf-daily')
+            if not p:
+                continue
+            if p['id'] not in papers:
+                papers[p['id']] = p
 
     # 2) hf-trending (global)
     endpoint = 'https://huggingface.co/api/daily_papers?sort=trending&limit=100'
